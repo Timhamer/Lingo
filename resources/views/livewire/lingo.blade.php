@@ -17,17 +17,29 @@
 
     <!-- Game Title -->
     <h1 class="text-4xl font-bold mb-8">Lingo Game</h1>
+    {{ $word[0] }}
+    {{ $word[1] }}
+    {{ $word[2] }}
+    {{ $word[3] }}
+    {{ $word[4] }}
+
     @if(!$showNameInput)
         <h2 class="text-4xl font-bold mb-8">{{ $score }}</h2>
         <!-- Game Board -->
         <div id="gameBoard" class="grid grid-cols-5 gap-4 mt-6">
             @foreach($guessedLetters as $row)
                 @foreach($row as $letter)
-                    <div class="bg-white p-4 w-32 h-32 text-center flex justify-center items-center text-2xl
-                    @if(isset($correctPositionFlags[$loop->parent->index][$loop->index]) && $correctPositionFlags[$loop->parent->index][$loop->index]) font-bold text-green-500 @endif
-                    @if(isset($correctLetterFlags[$loop->parent->index][$loop->index]) && $correctLetterFlags[$loop->parent->index][$loop->index]) font-bold text-yellow-500 @endif">
-                        {{ $letter }}
-                    </div>
+                <div class="p-4 w-32 h-32 text-center flex justify-center items-center text-2xl
+                border-4 border-white rounded-3xl
+                @if(isset($correctPositionFlags[$loop->parent->index][$loop->index]) && $correctPositionFlags[$loop->parent->index][$loop->index]) bg-green-500
+                @elseif(isset($correctLetterFlags[$loop->parent->index][$loop->index]) && $correctLetterFlags[$loop->parent->index][$loop->index]) bg-red-500
+                @else bg-blue-500
+                @endif">
+                {{ $letter }}
+            </div>
+            
+            
+
                 @endforeach
             @endforeach
         </div>

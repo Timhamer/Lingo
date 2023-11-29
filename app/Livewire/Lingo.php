@@ -8,216 +8,179 @@ use Illuminate\Support\Facades\DB;
 
 class Lingo extends Component
 {
-    private string $jsonPath = 'resources/json';
-    public mixed $words = [];
-    public array $word;
-    public string $userGuess;
-    public bool $isCorrect;
-    public array $guessedLetters = [['', '', '', '', ''], ['', '', '', '', ''], ['', '', '', '', ''], ['', '', '', '', ''], ['', '', '', '', '']];
-    public int $currentRow = 0;
-    public array $correctPositionFlags = [];
-    public array $correctLetterFlags = [];
-    public array $correctLetters = [];
-    public $validationMessages = [];
-    public int $score;
-    public int $rowScore;
-    public int $round = 1;
-    public bool $showNameInput = false;
-    public string $userName = '';
 
+    private string $jsonPath = 'resources/json'; //Path to json
+    public mixed $words = []; //All the words
+    public array $word; //Current word
+    public string $userGuess; //The user's guess
+    public array $guessedLetters = [['', '', '', '', ''], ['', '', '', '', ''], ['', '', '', '', ''], ['', '', '', '', ''], ['', '', '', '', '']]; //The guessed letters for each row
+    public int $currentRow = 0; //The amount of guess have taken place and which row they're at
+    public array $correctPositionFlags = []; //An array with all the correct letter positions.
+    public array $correctLetterFlags = []; //An array with all the correct letters and not positions
+    public array $correctLetters = []; //An array with the correct letters to show in the next row.
+    public int $score = 0; //This game user's score
+    public int $rowScore; //The row score of the user
+    public int $round = 1; //The current round
+    public bool $showNameInput = false; //A bool to show the name input and hide the game
+    public string $userName = ''; //The name the user entered in the input
+
+    //On startup, fires
     public function mount()
     {
+        //Get the words file
         $root = $_SERVER['DOCUMENT_ROOT'];
-        
+
         $jsonFile = $root . '/../' . $this->jsonPath . '/words.json';
 
+        //Make a php array of the words
         $this->words = json_decode(file_get_contents($jsonFile), true)['words'];
 
+        //pick a random word from the words array, capatilize it and seperate the letters
         $word = array_rand($this->words);
         $word = strtoupper($this->words[$word]);
         $this->word = str_split($word);
+
+        //Make the first letter visible and green
         $this->guessedLetters[$this->currentRow][0] = $this->word[0];
         $this->correctPositionFlags[$this->currentRow][0] = true;
-        $this->score = 0;
     }
 
+    //Get the top 10 scores from the database
     public function getTopScores()
     {
         return Score::orderBy('score', 'desc')->limit(10)->get();
     }
 
-    public function newGame() {
+    //Reset variables to make a new game.
+    public function newGame()
+    {
+        $this->newRound(true);
         $this->round = 1;
-        $word = array_rand($this->words);
-        $word = strtoupper($this->words[$word]);
-        $this->word = str_split($word);
-        $this->currentRow = 0;
-        $this->guessedLetters = [['', '', '', '', ''], ['', '', '', '', ''], ['', '', '', '', ''], ['', '', '', '', ''], ['', '', '', '', '']];
-        $this->guessedLetters[$this->currentRow][0] = $this->word[0];
-        $this->correctPositionFlags = [];
-        $this->correctPositionFlags[$this->currentRow][0] = true;
-        $this->correctLetterFlags = [];
-        $this->correctLetters = [];
         $this->score = 0;
     }
 
-    public function newRound() {
-        if ($this->round < 5) {
-        $this->round += 1;
-        $word = array_rand($this->words);
-        $word = strtoupper($this->words[$word]);
-        $this->word = str_split($word);
-        $this->currentRow = 0;
-        $this->guessedLetters = [['', '', '', '', ''], ['', '', '', '', ''], ['', '', '', '', ''], ['', '', '', '', ''], ['', '', '', '', '']];
-        $this->guessedLetters[$this->currentRow][0] = $this->word[0];
-        $this->correctPositionFlags = [];
-        $this->correctPositionFlags[$this->currentRow][0] = true;
-        $this->correctLetterFlags = [];
-        $this->correctLetters = [];
-        } else {
+    //Reset variables to make a new round. If you give a parameter, reset the round anyway
+    public function newRound($newGame = NULL)
+    {
+        //Checks if the current round isn't at its max or if there is a parameter given
+        if ($this->round < 5 || $newGame != NULL) {
+            //Reset variables and pick a new word
+            $this->round += 1;
+            $word = array_rand($this->words);
+            $word = strtoupper($this->words[$word]);
+            $this->word = str_split($word);
+            $this->currentRow = 0;
+            $this->guessedLetters = [['', '', '', '', ''], ['', '', '', '', ''], ['', '', '', '', ''], ['', '', '', '', ''], ['', '', '', '', '']];
+            $this->guessedLetters[$this->currentRow][0] = $this->word[0];
+            $this->correctPositionFlags = [];
+            $this->correctPositionFlags[$this->currentRow][0] = true;
+            $this->correctLetterFlags = [];
+            $this->correctLetters = [];
+        } else { //Else show the input and hide the game.
             $this->showNameInput = true;
         }
     }
 
+    //Check every letter of the user's guess
     public function checkGuess()
     {
-        // Clear previous validation messages
-        $this->validationMessages = [];
         $this->rowScore = 0;
-        // Validate the user input
+        //Validate the guess of the user
         $this->validate([
             'userGuess' => 'required|alpha|size:5',
         ]);
-
-        // Check if the guess is correct
-        $this->isCorrect = strtoupper($this->userGuess) === implode('', $this->word);
-
-        // Update the guessedLetters array for the current row based on the correct positions of the guessed letters
-        $guessedLettersArray = str_split(strtoupper($this->userGuess));
-
-        // Track the occurrences of each letter in the word
-        $occurrencesInWord = array_count_values($this->word);
-
+        //Make another array with each letter of the word
         $unmatchedWord = $this->word;
-
-        // Iterate through each letter in the user's guess
+        //For each letter in the user's guess
         foreach (str_split(strtoupper($this->userGuess)) as $index => $letter) {
-        
-        // Check if the letter is present in the word
-        if (in_array($letter, $unmatchedWord)) {
-            if ($letter === $this->word[$index]) {
-                // Letter is in the correct position
-                $this->correctPositionFlags[$this->currentRow][$index] = true;
-                $this->rowScore += 20;
-                if ($this->currentRow < 4) {
-                $this->correctLetters[$index] = $letter;
-
-                $this->guessedLetters[$this->currentRow+1][$index] = $letter;
-
-            $this->correctPositionFlags[$this->currentRow+1][$index] = true;
-                }
-                unset($unmatchedWord[array_search($letter, $unmatchedWord)]);
-            } 
-        } else {
-            $this->correctPositionFlags[$this->currentRow][$index] = false;
-        }
-            if (isset($this->correctLetters[$index])) {
-            $this->guessedLetters[$this->currentRow+1][$index] = $this->correctLetters[$index];
-            $this->correctPositionFlags[$this->currentRow+1][$index] = true;
-            } else {
-                $this->guessedLetters[$this->currentRow+1][$index] = "";
-            $this->correctPositionFlags[$this->currentRow+1][$index] = false;
-            }
-        }
-
-        foreach ($guessedLettersArray as $index => $letter) {
-            $this->guessedLetters[$this->currentRow][$index] = $letter;
-
-            if (in_array($letter, $unmatchedWord)) {// Check if the guessed letter is in the correct position
-            if ($this->word[$index] === $letter) {
-                $this->correctPositionFlags[$this->currentRow][$index] = true;
-            } else {
-                // Check if the letter occurs in the word
-                if (in_array($letter, $this->word)) {
-                    // Check if the letter is in the correct position
-                    $correctPositionIndex = array_search($letter, $this->word);
-                    if (!isset($this->correctPositionFlags[$this->currentRow][$correctPositionIndex])) {
-                        // If not in the correct position, mark it as orange
-                        $this->correctLetterFlags[$this->currentRow][$index] = true;
-                        $this->rowScore += 10;
-                    }
-                }
-            }
-
-            // Check if we need to mark the letter as plain color
-            if (
-                $occurrencesInWord[$letter] === 1 
-                && !isset($this->correctLetterFlags[$this->currentRow][$index]) 
-                && !isset($this->correctPositionFlags[$this->currentRow][$index])
-            ) {
-                // If there's only one occurrence of the letter in the word, 
-                // and it's not marked green or orange, mark it as plain color
-                $this->correctLetterFlags[$this->currentRow][$index] = true;
-            } else {
+            //If the guessed letter is inside the word and hasn't exceeded the amount in the word
+            if (in_array($letter, $unmatchedWord)) {
+                //If the letter is the same and in the same place
                 if ($letter === $this->word[$index]) {
-                    // Letter is in the correct position
+                    //Make the letter the correct position color
                     $this->correctPositionFlags[$this->currentRow][$index] = true;
-                } else {
-                    $this->correctPositionFlags[$this->currentRow][$index] = false;
-                    $this->correctLetterFlags[$this->currentRow][$index] = true;
+                    //Increase the score
+                    $this->rowScore += 20;
+                    //If it isn't the last round
+                    if ($this->currentRow < 4) {
+                        //Make the letters visible in the next row
+                        $this->correctLetters[$index] = $letter;
 
+                        $this->guessedLetters[$this->currentRow + 1][$index] = $letter;
+
+                        $this->correctPositionFlags[$this->currentRow + 1][$index] = true;
+                    }
+                    //Remove the letter from the temporary word array
+                    unset($unmatchedWord[array_search($letter, $unmatchedWord)]);
+                } else { //Else not make the letter the correct position color
+                    $this->correctPositionFlags[$this->currentRow][$index] = false;
+                }
+            } else { //Else not make the letter the correct position color
+                $this->correctPositionFlags[$this->currentRow][$index] = false;
+            }
+            //If the letter is correct and in the same position
+            if (isset($this->correctLetters[$index])) {
+                //Make the letter visible in the next row
+                $this->guessedLetters[$this->currentRow + 1][$index] = $this->correctLetters[$index];
+                $this->correctPositionFlags[$this->currentRow + 1][$index] = true;
+            } else { //Else remove the correct position color property
+                $this->guessedLetters[$this->currentRow + 1][$index] = "";
+                $this->correctPositionFlags[$this->currentRow + 1][$index] = false;
+            }
+        }
+        //For each letter in the user's guess
+        foreach (str_split(strtoupper($this->userGuess)) as $index => $letter) {
+            //Add the guessed letters to the guessedLetters array
+            $this->guessedLetters[$this->currentRow][$index] = $letter;
+            //If the letter is inside the temporary array
+            if (in_array($letter, $unmatchedWord)) {
+                //Make the letter the correct letter color
+                $this->correctLetterFlags[$this->currentRow][$index] = true;
+                //Increase the score
+                $this->rowScore += 10;
+            } else { //If the letter isn't inside the temporary array
+                //Remove the correct letter property
+                $this->correctLetterFlags[$this->currentRow][$index] = false;
+                //If the letter isn't inside the temporary array is incorrect
+                if ($this->guessedLetters[$this->currentRow][$index] != $this->word[$index]) {
+                    //Remove the correct position color
+                    $this->correctPositionFlags[$this->currentRow][$index] = false;
                 }
             }
-        } else {
-            if ($letter === $this->word[$index]) {
-                // Letter is in the correct position
-                $this->correctPositionFlags[$this->currentRow][$index] = true;
-            } else {
-                $this->correctPositionFlags[$this->currentRow][$index] = false;
-                
+        }
+        //Check if the word is guessed
+        if ($this->rowScore != 100) {
+            $this->score += $this->rowScore;
+            $this->currentRow++;
+            //If it isn't the last row
+            if ($this->currentRow < 5) {
+                //Show the letters in the next row
+                $this->guessedLetters[$this->currentRow][0] = $this->word[0];
+                $this->correctPositionFlags[$this->currentRow][0] = true;
+            } else { //It is the last row
+                $this->newRound();
             }
-            // $this->correctLetterFlags[$this->currentRow][$index] = false;
+        } else { //The word isn't guessed
+            $this->score += $this->rowScore * (5 - $this->currentRow);
+            $this->newRound();
+        }
+        //If it is the last row and not guessed the word, show a new row with the word
+        if ($this->currentRow == 5) {
+            for ($i = 0; $i < $this->currentRow; $i++) {
+                $this->guessedLetters[$this->currentRow][$i] = $this->word[$i];
+                $this->correctPositionFlags[$this->currentRow][$i] = true;
+            }
+
         }
     }
 
-    // Move to the next row
-    if ($this->rowScore != 100) {
-        $this->score += $this->rowScore;
-        $this->currentRow++;
-        if ($this->currentRow < 5) {
-            $this->guessedLetters[$this->currentRow][0] = $this->word[0];
-            $this->correctPositionFlags[$this->currentRow][0] = true;
-        }
-    } else {
-        $this->score += $this->rowScore * (5-$this->currentRow);
-        // sleep(2);
-        // $this->dispatchBrowserEvent('delay-and-new-round');
+    //Inserts the user's score and name to the database
+    public function saveScore()
+    {
+        DB::table('scores')->insert(['username' => $this->userName, 'score' => $this->score]);
 
-        $this->newRound();
+        $this->showNameInput = false;
+        $this->userName = '';
+        $this->newGame();
     }
-
-    // Check if the maximum number of rows is reached
-    if ($this->currentRow == 5) {
-        for ($i=0; $i < $this->currentRow; $i++) { 
-            $this->guessedLetters[$this->currentRow][$i] = $this->word[$i];
-            $this->correctPositionFlags[$this->currentRow][$i] = true;
-        }
-        // sleep(3);
-        // $this->dispatchBrowserEvent('delay-and-new-round');
-
-    }
-    
-}
-
-public function saveScore()
-{
-    // Insert the score and name into your SQLite database
-    DB::table('scores')->insert(['username' => $this->userName, 'score' => $this->score]);
-
-    // Reset properties for the next game
-    $this->showNameInput = false;
-    $this->userName = '';
-    $this->newGame();
-}
-
 }
