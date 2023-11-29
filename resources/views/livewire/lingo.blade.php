@@ -17,11 +17,6 @@
 
     <!-- Game Title -->
     <h1 class="text-4xl font-bold mb-8">Lingo Game</h1>
-    {{ $word[0] }}
-    {{ $word[1] }}
-    {{ $word[2] }}
-    {{ $word[3] }}
-    {{ $word[4] }}
 
     @if(!$showNameInput)
         <h2 class="text-4xl font-bold mb-8">{{ $score }}</h2>
