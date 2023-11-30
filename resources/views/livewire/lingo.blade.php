@@ -18,8 +18,8 @@
     <!-- Game Title -->
     <h1 class="text-4xl font-bold mb-8">Lingo Game</h1>
 
+    <h2 class="text-4xl font-bold mb-8">{{ $score }}</h2>
     @if(!$showNameInput)
-        <h2 class="text-4xl font-bold mb-8">{{ $score }}</h2>
         <!-- Game Board -->
         <div id="gameBoard" class="grid grid-cols-5 gap-4 mt-6">
             @foreach($guessedLetters as $row)
