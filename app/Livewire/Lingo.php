@@ -138,6 +138,7 @@ class Lingo extends Component
                 $this->correctLetterFlags[$this->currentRow][$index] = true;
                 //Increase the score
                 $this->rowScore += 10;
+                unset($unmatchedWord[array_search($letter, $unmatchedWord)]);
             } else { //If the letter isn't inside the temporary array
                 //Remove the correct letter property
                 $this->correctLetterFlags[$this->currentRow][$index] = false;
